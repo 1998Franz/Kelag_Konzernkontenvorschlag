@@ -10,7 +10,7 @@ excel_pfad = "Konzernkontenplan_template.xlsx"
 df = pd.read_excel(excel_pfad)
 
 # Modell laden (cache für Speed)
-modell_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+modell_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 @st.cache_resource
 def lade_modell():
     return SentenceTransformer(modell_name)
