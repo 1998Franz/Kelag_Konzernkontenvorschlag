@@ -69,18 +69,18 @@ if st.button("Sachkonto-Vorschläge berechnen"):
     eingabe_text = f"{eingabe_bezeichnung} {eingabe_beschreibung}"
     eingabe_embedding = modell.encode([eingabe_text], convert_to_tensor=True)
 
-    # 5. Ähnlichkeit berechnen und alle Treffer mit Score > 0.55 (55%) nehmen
+    # 5. Ähnlichkeit berechnen und alle Treffer mit Score > 0.60 (60%) nehmen
     aehnlichkeit = util.pytorch_cos_sim(eingabe_embedding, alle_embeddings)[0]
-    relevante_indices = (aehnlichkeit > 0.55).nonzero().tolist()
+    relevante_indices = (aehnlichkeit > 0.60).nonzero().tolist()
     relevante_indices = sorted([idx[0] for idx in relevante_indices], key=lambda i: float(aehnlichkeit[i]), reverse=True)
 
     if not relevante_indices:
-        st.warning("Keine Sachkonten mit einer Wahrscheinlichkeit >55% gefunden.")
+        st.warning("Keine Sachkonten mit einer Wahrscheinlichkeit >60% gefunden.")
     else:
         treffer = []
         for idx in relevante_indices:
             treffer.append({
-                "Score": float(aehnlichkeit[idx]),
+                "Score": round(float(aehnlichkeit[idx]), 2),
                 "Sachkontonummer": df_filtered.iloc[idx]['Sachkontonummer'],
                 "Kontenbezeichnung": df_filtered.iloc[idx]['Kontenbezeichnung'],
                 "Beschreibung": df_filtered.iloc[idx]['Beschreibung'],
@@ -103,7 +103,7 @@ if st.button("Sachkonto-Vorschläge berechnen"):
         }
         result_df = pd.DataFrame([input_info] + treffer)
 
-        st.success(f"{len(treffer)} Sachkonten mit Score >50% gefunden.")
+        st.success(f"{len(treffer)} Sachkonten mit Score >60% gefunden.")
         st.dataframe(result_df, hide_index=True)
 
         # Download-Link für Excel
