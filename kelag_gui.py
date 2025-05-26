@@ -16,7 +16,7 @@ def lade_modell():
     return SentenceTransformer(modell_name)
 modell = lade_modell()
 
-# GUI Inputs
+# --- GUI Inputs ---
 konto_art = st.radio(
     "Art des neuen Sachkontos",
     ["Bilanz", "GuV"]
