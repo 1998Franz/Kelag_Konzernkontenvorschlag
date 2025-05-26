@@ -49,9 +49,9 @@ if st.button("Sachkonto-Vorschläge berechnen"):
     eingabe_text = f"{eingabe_bezeichnung} {eingabe_beschreibung}"
     eingabe_embedding = modell.encode([eingabe_text], convert_to_tensor=True)
 
-    # 5. Ähnlichkeit berechnen und alle Treffer mit Score > 0.5 (50%) nehmen
+    # 5. Ähnlichkeit berechnen und alle Treffer mit Score > 0.55 (55%) nehmen
     aehnlichkeit = util.pytorch_cos_sim(eingabe_embedding, alle_embeddings)[0]
-    relevante_indices = (aehnlichkeit > 0.5).nonzero().tolist()
+    relevante_indices = (aehnlichkeit > 0.55).nonzero().tolist()
     relevante_indices = sorted([idx[0] for idx in relevante_indices], key=lambda i: float(aehnlichkeit[i]), reverse=True)
 
     if not relevante_indices:
