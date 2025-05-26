@@ -94,18 +94,18 @@ if st.button("Sachkonto-Vorschläge berechnen"):
     eingabe_text = f"{eingabe_bezeichnung} {eingabe_beschreibung}"
     eingabe_embedding = modell.encode([eingabe_text], convert_to_tensor=True)
 
-    # 5. Score-Berechnung
+    # 5. Score-Berechnung & Logik
     aehnlichkeit = util.pytorch_cos_sim(eingabe_embedding, alle_embeddings)[0]
     alle_scores = [(i, float(aehnlichkeit[i])) for i in range(len(aehnlichkeit))]
     # Alle mit Score >= 0.50
     relevante = [x for x in alle_scores if x[1] >= 0.50]
     relevante = sorted(relevante, key=lambda x: x[1], reverse=True)
-    # Wenn weniger als 5, ergänze weitere (mit den höchsten Werten, aber <0.5)
+    # Wenn weniger als 5, ergänze weitere (mit den höchsten Werten, aber <0.5), aber NICHT beschränken wenn mehr!
     if len(relevante) < 5:
         rest = [x for x in alle_scores if x not in relevante]
         rest_sorted = sorted(rest, key=lambda x: x[1], reverse=True)
         relevante += rest_sorted[:max(0, 5-len(relevante))]
-    relevante = relevante[:5]
+    # KEINE Begrenzung auf 5! Wenn mehr als 5 mit Score>0.5, alle anzeigen!
 
     if not relevante:
         st.error("Es konnten keine ähnlichen Sachkonten gefunden werden.")
@@ -122,8 +122,7 @@ if st.button("Sachkonto-Vorschläge berechnen"):
                 "Position neu": df_filtered.iloc[idx]['Position neu'],
                 "Positionsbeschreibung neu": df_filtered.iloc[idx]['Positionsbeschreibung neu'],
             })
-
-        st.success(f"Es werden {len(treffer)} Sachkonten angezeigt. (Mindestens Score >50% – falls weniger als 5, werden die besten weiteren ergänzt.)")
+        st.success(f"Es werden {len(treffer)} Sachkonten angezeigt. (Alle mit Score >50%, falls weniger als 5, werden die besten weiteren ergänzt.)")
         st.dataframe(pd.DataFrame(treffer), hide_index=True)
 
         # Download-Link für Excel
