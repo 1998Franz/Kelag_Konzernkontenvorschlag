@@ -94,15 +94,28 @@ if st.button("Sachkonto-Vorschläge berechnen"):
     eingabe_text = f"{eingabe_bezeichnung} {eingabe_beschreibung}"
     eingabe_embedding = modell.encode([eingabe_text], convert_to_tensor=True)
 
-    # Hilfsfunktion: Treffer für Schwellwert holen
-    def get_treffer(threshold):
-        aehnlichkeit = util.pytorch_cos_sim(eingabe_embedding, alle_embeddings)[0]
-        relevante_indices = (aehnlichkeit > threshold).nonzero().tolist()
-        relevante_indices = sorted([idx[0] for idx in relevante_indices], key=lambda i: float(aehnlichkeit[i]), reverse=True)
+    # 5. Score-Berechnung
+    aehnlichkeit = util.pytorch_cos_sim(eingabe_embedding, alle_embeddings)[0]
+    alle_scores = [(i, float(aehnlichkeit[i])) for i in range(len(aehnlichkeit))]
+    # Alle mit Score >= 0.50
+    relevante = [x for x in alle_scores if x[1] >= 0.50]
+    relevante = sorted(relevante, key=lambda x: x[1], reverse=True)
+    # Wenn weniger als 5, ergänze weitere (mit den höchsten Werten, aber <0.5)
+    if len(relevante) < 5:
+        # Ergänze um weitere (nur die, die noch nicht enthalten sind)
+        rest = [x for x in alle_scores if x not in relevante]
+        rest_sorted = sorted(rest, key=lambda x: x[1], reverse=True)
+        relevante += rest_sorted[:max(0, 5-len(relevante))]
+    # Nimm maximal 5
+    relevante = relevante[:5]
+
+    if not relevante:
+        st.error("Es konnten keine ähnlichen Sachkonten gefunden werden.")
+    else:
         treffer = []
-        for idx in relevante_indices:
+        for idx, score in relevante:
             treffer.append({
-                "Score": round(float(aehnlichkeit[idx]), 2),
+                "Score": round(score, 2),
                 "Sachkontonummer": df_filtered.iloc[idx]['Sachkontonummer'],
                 "Kontenbezeichnung": df_filtered.iloc[idx]['Kontenbezeichnung'],
                 "Beschreibung": df_filtered.iloc[idx]['Beschreibung'],
@@ -111,43 +124,7 @@ if st.button("Sachkonto-Vorschläge berechnen"):
                 "Position neu": df_filtered.iloc[idx]['Position neu'],
                 "Positionsbeschreibung neu": df_filtered.iloc[idx]['Positionsbeschreibung neu'],
             })
-        return treffer, aehnlichkeit
-
-    # 5. Dreistufige Suche
-    treffer, aehnlichkeit = get_treffer(0.60)
-    if not treffer:
-        st.warning("In der ersten Runde mit 60% Wahrscheinlichkeit wurde kein Sachkonto gefunden. Starte zweite Runde mit 55%.")
-        treffer, aehnlichkeit = get_treffer(0.55)
-        if not treffer:
-            st.warning("Auch mit 55% Wahrscheinlichkeit wurde kein Sachkonto gefunden. Starte dritte Runde mit 50%.")
-            treffer, aehnlichkeit = get_treffer(0.50)
-            if not treffer:
-                st.error("Auch mit 50% Wahrscheinlichkeit wurde kein Sachkonto gefunden. Es werden die besten 5 Vorschläge angezeigt.")
-                # Top 5 Vorschläge anzeigen, nach Score sortiert
-                alle_scores = [(i, float(aehnlichkeit[i])) for i in range(len(aehnlichkeit))]
-                alle_scores = sorted(alle_scores, key=lambda x: x[1], reverse=True)[:5]
-                treffer = []
-                for idx, score in alle_scores:
-                    treffer.append({
-                        "Score": round(score, 2),
-                        "Sachkontonummer": df_filtered.iloc[idx]['Sachkontonummer'],
-                        "Kontenbezeichnung": df_filtered.iloc[idx]['Kontenbezeichnung'],
-                        "Beschreibung": df_filtered.iloc[idx]['Beschreibung'],
-                        "Positiv": df_filtered.iloc[idx]['Positiv'],
-                        "Negativ": df_filtered.iloc[idx]['Negativ'],
-                        "Position neu": df_filtered.iloc[idx]['Position neu'],
-                        "Positionsbeschreibung neu": df_filtered.iloc[idx]['Positionsbeschreibung neu'],
-                    })
-                st.info("Hier sind die Top 5 Sachkonto-Vorschläge (unabhängig vom Schwellenwert):")
-            else:
-                st.success(f"{len(treffer)} Sachkonten mit Score >50% gefunden (3. Runde).")
-        else:
-            st.success(f"{len(treffer)} Sachkonten mit Score >55% gefunden (2. Runde).")
-    else:
-        st.success(f"{len(treffer)} Sachkonten mit Score >60% gefunden.")
-
-    if treffer:
-        # Input-Zeile als Kopf einfügen (enthält Art + Untertyp)
+        # Input-Zeile als Kopf einfügen
         input_info = {
             "Score": "INPUT",
             "Sachkontonummer": "",
@@ -160,6 +137,7 @@ if st.button("Sachkonto-Vorschläge berechnen"):
         }
         result_df = pd.DataFrame([input_info] + treffer)
 
+        st.success(f"Es werden {len(treffer)} Sachkonten angezeigt. (Mindestens Score >50% – falls weniger als 5, werden die besten weiteren ergänzt.)")
         st.dataframe(result_df, hide_index=True)
 
         # Download-Link für Excel
@@ -167,6 +145,5 @@ if st.button("Sachkonto-Vorschläge berechnen"):
         result_df.to_excel(output_path, index=False)
         with open(output_path, "rb") as f:
             st.download_button("Ergebnis als Excel herunterladen", f, file_name=output_path)
-
 else:
     st.info("Bitte Bezeichnung und Beschreibung eingeben und auf 'Sachkonto-Vorschläge berechnen' klicken.")
