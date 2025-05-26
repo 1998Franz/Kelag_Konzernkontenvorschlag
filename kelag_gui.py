@@ -102,11 +102,9 @@ if st.button("Sachkonto-Vorschläge berechnen"):
     relevante = sorted(relevante, key=lambda x: x[1], reverse=True)
     # Wenn weniger als 5, ergänze weitere (mit den höchsten Werten, aber <0.5)
     if len(relevante) < 5:
-        # Ergänze um weitere (nur die, die noch nicht enthalten sind)
         rest = [x for x in alle_scores if x not in relevante]
         rest_sorted = sorted(rest, key=lambda x: x[1], reverse=True)
         relevante += rest_sorted[:max(0, 5-len(relevante))]
-    # Nimm maximal 5
     relevante = relevante[:5]
 
     if not relevante:
@@ -124,25 +122,13 @@ if st.button("Sachkonto-Vorschläge berechnen"):
                 "Position neu": df_filtered.iloc[idx]['Position neu'],
                 "Positionsbeschreibung neu": df_filtered.iloc[idx]['Positionsbeschreibung neu'],
             })
-        # Input-Zeile als Kopf einfügen
-        input_info = {
-            "Score": "INPUT",
-            "Sachkontonummer": "",
-            "Kontenbezeichnung": eingabe_bezeichnung,
-            "Beschreibung": eingabe_beschreibung,
-            "Positiv": "",
-            "Negativ": "",
-            "Position neu": konto_info,
-            "Positionsbeschreibung neu": "",
-        }
-        result_df = pd.DataFrame([input_info] + treffer)
 
         st.success(f"Es werden {len(treffer)} Sachkonten angezeigt. (Mindestens Score >50% – falls weniger als 5, werden die besten weiteren ergänzt.)")
-        st.dataframe(result_df, hide_index=True)
+        st.dataframe(pd.DataFrame(treffer), hide_index=True)
 
         # Download-Link für Excel
         output_path = "Matching_Ergebnis_offline.xlsx"
-        result_df.to_excel(output_path, index=False)
+        pd.DataFrame(treffer).to_excel(output_path, index=False)
         with open(output_path, "rb") as f:
             st.download_button("Ergebnis als Excel herunterladen", f, file_name=output_path)
 else:
