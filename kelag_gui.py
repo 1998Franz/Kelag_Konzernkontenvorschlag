@@ -97,14 +97,11 @@ if st.button("Sachkonto-Vorschläge berechnen"):
     eingabe_text = f"{eingabe_bezeichnung} {eingabe_beschreibung}"
     eingabe_embedding = modell.encode([eingabe_text], convert_to_tensor=True)
 
-    # 5. Ähnlichkeit berechnen und alle Treffer mit Score > 0.60 (60%) nehmen
-    aehnlichkeit = util.pytorch_cos_sim(eingabe_embedding, alle_embeddings)[0]
-    relevante_indices = (aehnlichkeit > 0.60).nonzero().tolist()
-    relevante_indices = sorted([idx[0] for idx in relevante_indices], key=lambda i: float(aehnlichkeit[i]), reverse=True)
-
-    if not relevante_indices:
-        st.warning("Keine Sachkonten mit einer Wahrscheinlichkeit >60% gefunden.")
-    else:
+    # 5. Ähnlichkeit berechnen mit 2 Stufen (60%, dann 55%)
+    def get_treffer(threshold):
+        aehnlichkeit = util.pytorch_cos_sim(eingabe_embedding, alle_embeddings)[0]
+        relevante_indices = (aehnlichkeit > threshold).nonzero().tolist()
+        relevante_indices = sorted([idx[0] for idx in relevante_indices], key=lambda i: float(aehnlichkeit[i]), reverse=True)
         treffer = []
         for idx in relevante_indices:
             treffer.append({
@@ -117,7 +114,22 @@ if st.button("Sachkonto-Vorschläge berechnen"):
                 "Position neu": df_filtered.iloc[idx]['Position neu'],
                 "Positionsbeschreibung neu": df_filtered.iloc[idx]['Positionsbeschreibung neu'],
             })
+        return treffer
 
+    # Erste Runde mit 60 %
+    treffer = get_treffer(0.60)
+
+    if not treffer:
+        st.warning("In der ersten Runde mit 60% Wahrscheinlichkeit wurde kein Sachkonto gefunden. Starte nun eine zweite Runde mit 55%.")
+        treffer = get_treffer(0.55)
+        if not treffer:
+            st.error("Auch mit 55% Wahrscheinlichkeit wurde kein Sachkonto gefunden.")
+        else:
+            st.success(f"{len(treffer)} Sachkonten mit Score >55% gefunden (2. Runde).")
+    else:
+        st.success(f"{len(treffer)} Sachkonten mit Score >60% gefunden.")
+
+    if treffer:
         # Input-Zeile als Kopf einfügen (enthält Art + Untertyp)
         input_info = {
             "Score": "INPUT",
@@ -131,7 +143,6 @@ if st.button("Sachkonto-Vorschläge berechnen"):
         }
         result_df = pd.DataFrame([input_info] + treffer)
 
-        st.success(f"{len(treffer)} Sachkonten mit Score >60% gefunden.")
         st.dataframe(result_df, hide_index=True)
 
         # Download-Link für Excel
