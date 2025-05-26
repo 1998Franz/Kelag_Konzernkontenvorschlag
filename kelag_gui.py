@@ -3,7 +3,7 @@ from sentence_transformers import SentenceTransformer, util
 import streamlit as st
 
 st.set_page_config(page_title="Kelag Kontenplan Matching", layout="centered")
-st.title("Kelag Konzernkontenplan: Sachkonto-Matching")
+st.title("Kelag Konzernkontenplan: Sachkonto-Mapping alt auf neu")
 
 # 1. Excel einlesen
 excel_pfad = "Konzernkontenplan_template.xlsx"
