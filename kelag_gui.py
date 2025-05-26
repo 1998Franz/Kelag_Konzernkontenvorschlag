@@ -1,10 +1,6 @@
-import os
 import pandas as pd
 from sentence_transformers import SentenceTransformer, util
 import streamlit as st
-
-# Optional: Ordnerwechsel für lokale Nutzung (für Cloud ggf. anpassen oder auskommentieren)
-os.chdir(r"C:\Users\fhaim\OneDrive\Desktop\Kelag_Konzernkontenplan\Projekt")
 
 st.set_page_config(page_title="Kelag Kontenplan Matching", layout="centered")
 st.title("Kelag Konzernkontenplan: Sachkonto-Matching")
@@ -98,4 +94,3 @@ if st.button("Sachkonto-Vorschläge berechnen"):
 
 else:
     st.info("Bitte Bezeichnung und Beschreibung eingeben und auf 'Sachkonto-Vorschläge berechnen' klicken.")
-
