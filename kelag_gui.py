@@ -22,15 +22,35 @@ konto_art = st.radio(
     ["Bilanz", "GuV"]
 )
 
+untertyp = ""
+if konto_art == "Bilanz":
+    untertyp = st.selectbox(
+        "Bilanz-Untertyp auswählen",
+        ["Aktiv", "Passiv EK", "Passiv FK"]
+    )
+
 eingabe_bezeichnung = st.text_input("Bezeichnung des neuen Sachkontos")
 eingabe_beschreibung = st.text_area("Beschreibung des neuen Sachkontos", height=100)
 
 if st.button("Sachkonto-Vorschläge berechnen"):
-    # 2. Filter nach Kontenart
-    if konto_art.lower() == "bilanz":
-        startziffern = ('1', '2', '3', '4', '5')
-    else:
+    # 2. Filter nach Kontenart und ggf. Bilanz-Untertyp
+    if konto_art.lower() == "guv":
         startziffern = ('6', '7', '8', '9')
+        konto_info = "GuV"
+    else:  # Bilanz
+        if untertyp == "Aktiv":
+            startziffern = ('1', '2')
+            konto_info = "Bilanz - Aktiv"
+        elif untertyp == "Passiv EK":
+            startziffern = ('3',)
+            konto_info = "Bilanz - Passiv EK"
+        elif untertyp == "Passiv FK":
+            startziffern = ('4', '5')
+            konto_info = "Bilanz - Passiv FK"
+        else:
+            startziffern = ('1', '2', '3', '4', '5')  # Fallback
+            konto_info = "Bilanz"
+
     df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
 
     # 3. Vergleichstext bauen
@@ -49,9 +69,9 @@ if st.button("Sachkonto-Vorschläge berechnen"):
     eingabe_text = f"{eingabe_bezeichnung} {eingabe_beschreibung}"
     eingabe_embedding = modell.encode([eingabe_text], convert_to_tensor=True)
 
-    # 5. Ähnlichkeit berechnen und alle Treffer mit Score > 0.55 (55%) nehmen
+    # 5. Ähnlichkeit berechnen und alle Treffer mit Score > 0.5 (50%) nehmen
     aehnlichkeit = util.pytorch_cos_sim(eingabe_embedding, alle_embeddings)[0]
-    relevante_indices = (aehnlichkeit > 0.55).nonzero().tolist()
+    relevante_indices = (aehnlichkeit > 0.5).nonzero().tolist()
     relevante_indices = sorted([idx[0] for idx in relevante_indices], key=lambda i: float(aehnlichkeit[i]), reverse=True)
 
     if not relevante_indices:
@@ -70,7 +90,7 @@ if st.button("Sachkonto-Vorschläge berechnen"):
                 "Positionsbeschreibung neu": df_filtered.iloc[idx]['Positionsbeschreibung neu'],
             })
 
-        # Input-Zeile als Kopf einfügen
+        # Input-Zeile als Kopf einfügen (enthält Art + Untertyp)
         input_info = {
             "Score": "INPUT",
             "Sachkontonummer": "",
@@ -78,7 +98,7 @@ if st.button("Sachkonto-Vorschläge berechnen"):
             "Beschreibung": eingabe_beschreibung,
             "Positiv": "",
             "Negativ": "",
-            "Position neu": konto_art,
+            "Position neu": konto_info,
             "Positionsbeschreibung neu": "",
         }
         result_df = pd.DataFrame([input_info] + treffer)
