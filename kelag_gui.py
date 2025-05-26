@@ -9,7 +9,7 @@ st.title("Kelag Konzernkontenplan: Sachkonto-Mapping alt auf neu")
 excel_pfad = "Konzernkontenplan_template.xlsx"
 df = pd.read_excel(excel_pfad)
 
-# Modell laden (cache für Speed)
+# Modell laden (stärkere Variante, mpnet!)
 modell_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 @st.cache_resource
 def lade_modell():
@@ -23,35 +23,63 @@ konto_art = st.radio(
 )
 
 untertyp = ""
+guv_untertyp = ""
 if konto_art == "Bilanz":
     untertyp = st.selectbox(
         "Bilanz-Untertyp auswählen",
         ["Aktiv", "Passiv EK", "Passiv FK"]
+    )
+elif konto_art == "GuV":
+    guv_untertyp = st.selectbox(
+        "GuV-Untertyp auswählen",
+        ["Ertrag", "Aufwand", "Finanzergebnis", "Ertragsteuerung"]
     )
 
 eingabe_bezeichnung = st.text_input("Bezeichnung des neuen Sachkontos")
 eingabe_beschreibung = st.text_area("Beschreibung des neuen Sachkontos", height=100)
 
 if st.button("Sachkonto-Vorschläge berechnen"):
-    # 2. Filter nach Kontenart und ggf. Bilanz-Untertyp
-    if konto_art.lower() == "guv":
-        startziffern = ('6', '7', '8', '9')
-        konto_info = "GuV"
+    # 2. Filter nach Kontenart und Untertyp
+    if konto_art == "GuV":
+        if guv_untertyp == "Ertrag":
+            startziffern = ('6',)
+            df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
+            konto_info = "GuV - Ertrag"
+        elif guv_untertyp == "Aufwand":
+            startziffern = ('7',)
+            df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
+            konto_info = "GuV - Aufwand"
+        elif guv_untertyp == "Finanzergebnis":
+            # Konten mit 80 bis 85 am Anfang
+            startziffern = tuple(str(i) for i in range(80, 86))  # "80", ..., "85"
+            df_filtered = df[df["Sachkontonummer"].astype(str).str[:2].isin(startziffern)]
+            konto_info = "GuV - Finanzergebnis"
+        elif guv_untertyp == "Ertragsteuerung":
+            # Konten mit 87 am Anfang
+            df_filtered = df[df["Sachkontonummer"].astype(str).str[:2] == '87']
+            konto_info = "GuV - Ertragsteuerung"
+        else:
+            # Fallback alle GuV
+            startziffern = ('6', '7', '8', '9')
+            df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
+            konto_info = "GuV"
     else:  # Bilanz
         if untertyp == "Aktiv":
             startziffern = ('1', '2')
+            df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
             konto_info = "Bilanz - Aktiv"
         elif untertyp == "Passiv EK":
             startziffern = ('3',)
+            df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
             konto_info = "Bilanz - Passiv EK"
         elif untertyp == "Passiv FK":
             startziffern = ('4', '5')
+            df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
             konto_info = "Bilanz - Passiv FK"
         else:
-            startziffern = ('1', '2', '3', '4', '5')  # Fallback
+            startziffern = ('1', '2', '3', '4', '5')
+            df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
             konto_info = "Bilanz"
-
-    df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
 
     # 3. Vergleichstext bauen
     def kombiniere_textzeile(row):
