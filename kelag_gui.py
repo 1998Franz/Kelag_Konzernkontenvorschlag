@@ -50,16 +50,13 @@ if st.button("Sachkonto-Vorschläge berechnen"):
             df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
             konto_info = "GuV - Aufwand"
         elif guv_untertyp == "Finanzergebnis":
-            # Konten mit 80 bis 85 am Anfang
-            startziffern = tuple(str(i) for i in range(80, 86))  # "80", ..., "85"
+            startziffern = tuple(str(i) for i in range(80, 86))
             df_filtered = df[df["Sachkontonummer"].astype(str).str[:2].isin(startziffern)]
             konto_info = "GuV - Finanzergebnis"
         elif guv_untertyp == "Ertragsteuerung":
-            # Konten mit 87 am Anfang
             df_filtered = df[df["Sachkontonummer"].astype(str).str[:2] == '87']
             konto_info = "GuV - Ertragsteuerung"
         else:
-            # Fallback alle GuV
             startziffern = ('6', '7', '8', '9')
             df_filtered = df[df["Sachkontonummer"].astype(str).str.startswith(startziffern)]
             konto_info = "GuV"
@@ -97,7 +94,7 @@ if st.button("Sachkonto-Vorschläge berechnen"):
     eingabe_text = f"{eingabe_bezeichnung} {eingabe_beschreibung}"
     eingabe_embedding = modell.encode([eingabe_text], convert_to_tensor=True)
 
-    # 5. Ähnlichkeit berechnen mit 2 Stufen (60%, dann 55%)
+    # Hilfsfunktion: Treffer für Schwellwert holen
     def get_treffer(threshold):
         aehnlichkeit = util.pytorch_cos_sim(eingabe_embedding, alle_embeddings)[0]
         relevante_indices = (aehnlichkeit > threshold).nonzero().tolist()
@@ -114,16 +111,36 @@ if st.button("Sachkonto-Vorschläge berechnen"):
                 "Position neu": df_filtered.iloc[idx]['Position neu'],
                 "Positionsbeschreibung neu": df_filtered.iloc[idx]['Positionsbeschreibung neu'],
             })
-        return treffer
+        return treffer, aehnlichkeit
 
-    # Erste Runde mit 60 %
-    treffer = get_treffer(0.60)
-
+    # 5. Dreistufige Suche
+    treffer, aehnlichkeit = get_treffer(0.60)
     if not treffer:
-        st.warning("In der ersten Runde mit 60% Wahrscheinlichkeit wurde kein Sachkonto gefunden. Starte nun eine zweite Runde mit 55%.")
-        treffer = get_treffer(0.55)
+        st.warning("In der ersten Runde mit 60% Wahrscheinlichkeit wurde kein Sachkonto gefunden. Starte zweite Runde mit 55%.")
+        treffer, aehnlichkeit = get_treffer(0.55)
         if not treffer:
-            st.error("Auch mit 55% Wahrscheinlichkeit wurde kein Sachkonto gefunden.")
+            st.warning("Auch mit 55% Wahrscheinlichkeit wurde kein Sachkonto gefunden. Starte dritte Runde mit 50%.")
+            treffer, aehnlichkeit = get_treffer(0.50)
+            if not treffer:
+                st.error("Auch mit 50% Wahrscheinlichkeit wurde kein Sachkonto gefunden. Es werden die besten 5 Vorschläge angezeigt.")
+                # Top 5 Vorschläge anzeigen, nach Score sortiert
+                alle_scores = [(i, float(aehnlichkeit[i])) for i in range(len(aehnlichkeit))]
+                alle_scores = sorted(alle_scores, key=lambda x: x[1], reverse=True)[:5]
+                treffer = []
+                for idx, score in alle_scores:
+                    treffer.append({
+                        "Score": round(score, 2),
+                        "Sachkontonummer": df_filtered.iloc[idx]['Sachkontonummer'],
+                        "Kontenbezeichnung": df_filtered.iloc[idx]['Kontenbezeichnung'],
+                        "Beschreibung": df_filtered.iloc[idx]['Beschreibung'],
+                        "Positiv": df_filtered.iloc[idx]['Positiv'],
+                        "Negativ": df_filtered.iloc[idx]['Negativ'],
+                        "Position neu": df_filtered.iloc[idx]['Position neu'],
+                        "Positionsbeschreibung neu": df_filtered.iloc[idx]['Positionsbeschreibung neu'],
+                    })
+                st.info("Hier sind die Top 5 Sachkonto-Vorschläge (unabhängig vom Schwellenwert):")
+            else:
+                st.success(f"{len(treffer)} Sachkonten mit Score >50% gefunden (3. Runde).")
         else:
             st.success(f"{len(treffer)} Sachkonten mit Score >55% gefunden (2. Runde).")
     else:
